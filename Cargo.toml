@@ -1,0 +1,8 @@
+[package]
+name = "option_set"
+version = "0.1.0"
+authors = ["Árpád Goretity <h2co3@h2co3.org>"]
+
+[dependencies]
+serde = "1.0.29"
+heck = "0.3.0"
