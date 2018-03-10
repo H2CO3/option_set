@@ -1,7 +1,15 @@
 [package]
-name = "option_set"
-version = "0.1.0"
-authors = ["Árpád Goretity <h2co3@h2co3.org>"]
+name          = "option_set"
+version       = "0.1.0"
+authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
+repository    = "https://github.com/H2CO3/option_set.git"
+homepage      = "https://github.com/H2CO3/option_set.git"
+license       = "MIT"
+readme        = "README.md"
+documentation = "https://docs.rs/option_set"
+description   = "Bitflags on steroids"
+keywords      = ["bitflags", "bitmask", "bit", "flags", "options"]
+categories    = ["data-structures", "encoding", "value-formatting", "parsing"]
 
 [dependencies]
 serde = "1.0.29"
