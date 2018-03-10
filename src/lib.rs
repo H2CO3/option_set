@@ -1,5 +1,36 @@
 //! A macro and a trait for implementing a bitset/flag type that
 //! serializes to and deserializes from a sequence of strings.
+//!
+//! # Usage
+//!
+//! ```
+//! #[macro_use]
+//! extern crate option_set;
+//! #[macro_use]
+//! extern crate bitflags;
+//! extern crate serde;
+//! extern crate serde_json;
+//!
+//! option_set! {
+//!     struct FooOptions: UpperCamel + u16 {
+//!         const BAR_FIRST        = 0x0001;
+//!         const QUX_SECOND_THING = 0x0080;
+//!         const LOL_3RD          = 0x4000;
+//!     }
+//! }
+//!
+//! fn main() {
+//!     let opts_in = FooOptions::BAR_FIRST | FooOptions::LOL_3RD;
+//!     let json = serde_json::to_string_pretty(&opts_in).unwrap();
+//!
+//!     println!("{}", json);
+//!
+//!     let opts_out: FooOptions = serde_json::from_str(&json).unwrap();
+//!
+//!     println!("{:?}", opts_out);
+//!     assert!(opts_out == opts_in);
+//! }
+//! ```
 
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
@@ -129,26 +160,26 @@ pub enum CaseTransform {
     Title,
 }
 
-impl Default for CaseTransform {
-    fn default() -> Self {
-        CaseTransform::Identity
-    }
-}
-
 impl CaseTransform {
-    /// Converts the name of an option flag to the case intrinsic to the implementing type.
-    fn transform(self, name: &str) -> Cow<str> {
+    /// Converts the name of an option flag to the specified case
+    fn apply(self, s: &str) -> Cow<str> {
         use CaseTransform::*;
 
         match self {
-            Identity => Cow::Borrowed(name),
-            LowerSnake => Cow::Owned(name.to_snake_case()),
-            UpperSnake => Cow::Owned(name.to_shouty_snake_case()),
-            LowerCamel => Cow::Owned(name.to_mixed_case()),
-            UpperCamel => Cow::Owned(name.to_camel_case()),
-            Kebab => Cow::Owned(name.to_kebab_case()),
-            Title => Cow::Owned(name.to_title_case()),
+            Identity   => Cow::Borrowed(s),
+            LowerSnake => Cow::Owned(s.to_snake_case()),
+            UpperSnake => Cow::Owned(s.to_shouty_snake_case()),
+            LowerCamel => Cow::Owned(s.to_mixed_case()),
+            UpperCamel => Cow::Owned(s.to_camel_case()),
+            Kebab      => Cow::Owned(s.to_kebab_case()),
+            Title      => Cow::Owned(s.to_title_case()),
         }
+    }
+}
+
+impl Default for CaseTransform {
+    fn default() -> Self {
+        CaseTransform::Identity
     }
 }
 
@@ -162,7 +193,7 @@ pub fn serialize<T, S>(options: &T, serializer: S, transform: CaseTransform) -> 
 
     for (&variant, &name) in T::VARIANTS.iter().zip(T::NAMES) {
         if *options & variant == variant {
-            seq.serialize_element(transform.transform(name).as_ref())?;
+            seq.serialize_element(&transform.apply(name))?;
         }
     }
 
@@ -187,23 +218,35 @@ impl<'de, T: OptionSet> Visitor<'de> for OptionSetVisitor<T> {
         f.write_str("set of option strings")
     }
 
-    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        use serde::de::Error;
-
+    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
         assert!(T::VARIANTS.len() == T::NAMES.len());
 
-        let names: Vec<_> = T::NAMES.iter().map(|name| self.0.transform(name)).collect();
-        let mut flags = T::default();
-
-        while let Some(elem) = seq.next_element()? {
-            let mut iter = T::VARIANTS.iter().zip(&names);
-
-            match iter.find(|&(_, &ref name)| name == elem) {
-                Some((&flag, _)) => flags |= flag,
-                None => Err(A::Error::unknown_variant(elem, T::NAMES))?,
+        match self.0 {
+            CaseTransform::Identity => extract_bits(seq, T::NAMES),
+            _ => {
+                let names: Vec<_> = T::NAMES.iter().map(|name| self.0.apply(name)).collect();
+                extract_bits(seq, &names)
             }
         }
-
-        Ok(flags)
     }
+}
+
+/// Actually performs the sequence processing and flag extraction.
+fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
+    where A: SeqAccess<'de>, T: OptionSet, S: AsRef<str> {
+
+    use serde::de::Error;
+
+    let mut flags = T::default();
+
+    while let Some(elem) = seq.next_element()? {
+        let mut iter = T::VARIANTS.iter().zip(names);
+
+        match iter.find(|&(_, ref name)| name.as_ref() == elem) {
+            Some((&flag, _)) => flags |= flag,
+            None => Err(A::Error::unknown_variant(elem, T::NAMES))?,
+        }
+    }
+
+    Ok(flags)
 }

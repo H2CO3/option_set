@@ -1,6 +1,6 @@
 [package]
 name          = "option_set"
-version       = "0.1.0"
+version       = "0.1.1"
 authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository    = "https://github.com/H2CO3/option_set.git"
 homepage      = "https://github.com/H2CO3/option_set.git"
@@ -12,5 +12,9 @@ keywords      = ["bitflags", "bitmask", "bit", "flags", "options"]
 categories    = ["data-structures", "encoding", "value-formatting", "parsing"]
 
 [dependencies]
-serde = "1.0.29"
-heck = "0.3.0"
+serde = "1.0"
+heck = "0.3"
+
+[dev-dependencies]
+serde_json = "1.0"
+bitflags = "1.0"
