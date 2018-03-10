@@ -141,7 +141,7 @@ pub trait OptionSet: Copy + Default + Eq + BitAnd<Output=Self> + BitOrAssign + '
     const NAMES: &'static [&'static str];
 }
 
-/// A Type that knows how to transform the case of individual option flag names.
+/// Type that knows how to transform the case of individual option flag names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CaseTransform {
     /// Do not transform the name.
@@ -242,7 +242,7 @@ fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
     while let Some(elem) = seq.next_element()? {
         let mut iter = T::VARIANTS.iter().zip(names);
 
-        match iter.find(|&(_, ref name)| name.as_ref() == elem) {
+        match iter.find(|&(_, name)| name.as_ref() == elem) {
             Some((&flag, _)) => flags |= flag,
             None => Err(A::Error::unknown_variant(elem, T::NAMES))?,
         }
