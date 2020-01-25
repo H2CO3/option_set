@@ -239,12 +239,12 @@ fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
 
     let mut flags = T::default();
 
-    while let Some(elem) = seq.next_element()? {
+    while let Some(elem) = seq.next_element::<Cow<'de, str>>()? {
         let mut iter = T::VARIANTS.iter().zip(names);
 
         match iter.find(|&(_, name)| name.as_ref() == elem) {
             Some((&flag, _)) => flags |= flag,
-            None => Err(A::Error::unknown_variant(elem, T::NAMES))?,
+            None => Err(A::Error::unknown_variant(&elem, T::NAMES))?,
         }
     }
 
