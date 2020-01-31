@@ -37,27 +37,29 @@
         unsafe_code,
         unstable_features,
         unused_import_braces, unused_qualifications, missing_docs)]
-#![cfg_attr(feature = "cargo-clippy",
-            allow(match_same_arms, clone_on_ref_ptr, needless_pass_by_value))]
-#![cfg_attr(feature = "cargo-clippy",
-            deny(wrong_pub_self_convention, used_underscore_binding,
-                 stutter, similar_names, pub_enum_variant_names,
-                 missing_docs_in_private_items,
-                 non_ascii_literal, unicode_not_nfc,
-                 result_unwrap_used, option_unwrap_used,
-                 option_map_unwrap_or_else, option_map_unwrap_or, filter_map,
-                 shadow_unrelated, shadow_reuse, shadow_same,
-                 int_plus_one, string_add_assign, if_not_else,
-                 invalid_upcast_comparisons,
-                 cast_precision_loss,
-                 cast_possible_wrap, cast_possible_truncation,
-                 mutex_integer, mut_mut, items_after_statements,
-                 print_stdout, mem_forget, maybe_infinite_iter))]
+#![allow(clippy::match_same_arms,
+         clippy::clone_on_ref_ptr,
+         clippy::needless_pass_by_value)]
+#![deny(clippy::wrong_pub_self_convention, clippy::used_underscore_binding,
+        clippy::module_name_repetitions, clippy::similar_names,
+        clippy::pub_enum_variant_names,
+        clippy::missing_docs_in_private_items,
+        clippy::non_ascii_literal, clippy::unicode_not_nfc,
+        clippy::result_unwrap_used, clippy::option_unwrap_used,
+        clippy::option_map_unwrap_or_else, clippy::option_map_unwrap_or,
+        clippy::filter_map,
+        clippy::shadow_unrelated, clippy::shadow_reuse, clippy::shadow_same,
+        clippy::int_plus_one, clippy::string_add_assign, clippy::if_not_else,
+        clippy::invalid_upcast_comparisons,
+        clippy::cast_precision_loss,
+        clippy::cast_possible_wrap, clippy::cast_possible_truncation,
+        clippy::mutex_integer, clippy::mut_mut, clippy::items_after_statements,
+        clippy::print_stdout, clippy::mem_forget, clippy::maybe_infinite_iter)]
 
 extern crate serde;
 extern crate heck;
 
-use std::ops::{ BitAnd, BitOrAssign };
+use std::ops::{ BitAnd, BitOrAssign, Deref };
 use std::fmt::{ self, Formatter };
 use std::borrow::Cow;
 use std::marker::PhantomData;
@@ -231,27 +233,48 @@ impl<'de, T: OptionSet> Visitor<'de> for OptionSetVisitor<T> {
     }
 }
 
+/// Actually performs the sequence processing and flag extraction.
+fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
+    where A: SeqAccess<'de>, T: OptionSet, S: Deref<Target=str> {
+
+    use serde::de::Error;
+
+    let mut flags = T::default();
+
+    while let Some(elem) = seq.next_element::<Str<'de>>()? {
+        let mut iter = T::VARIANTS.iter().zip(names);
+
+        match iter.find(|&(_, name)| **name == *elem) {
+            Some((&flag, _)) => flags |= flag,
+            None => Err(A::Error::unknown_variant(&elem, T::NAMES))?,
+        }
+    }
+
+    Ok(flags)
+}
+
+/// Equivalent of `Cow<'a, str>` except that this
+/// type can deserialize from a borrowed string.
 #[derive(Debug)]
 enum Str<'a> {
+    /// Owned.
     String(String),
+    /// Borrowed.
     Str(&'a str),
 }
 
-impl<'a> Str<'a> {
-    fn as_str(&self) -> &str {
-        match self {
+impl<'a> Deref for Str<'a> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        match *self {
             Str::Str(s) => s,
-            Str::String(s) => s.as_str()
+            Str::String(ref s) => s,
         }
     }
 }
 
-impl<'a> PartialEq for Str<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_str() == other.as_str()
-    }
-}
-
+/// Visitor for deserializing a `Str<'a>`.
 struct StrVisitor;
 
 impl<'a> Visitor<'a> for StrVisitor {
@@ -291,25 +314,4 @@ impl<'de> Deserialize<'de> for Str<'de> {
     {
         deserializer.deserialize_str(StrVisitor)
     }
-}
-
-
-/// Actually performs the sequence processing and flag extraction.
-fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
-    where A: SeqAccess<'de>, T: OptionSet, S: AsRef<str> {
-
-    use serde::de::Error;
-
-    let mut flags = T::default();
-
-    while let Some(elem) = seq.next_element::<Str<'de>>()? {
-        let mut iter = T::VARIANTS.iter().zip(names);
-
-        match iter.find(|&(_, name)| name.as_ref() == elem.as_str()) {
-            Some((&flag, _)) => flags |= flag,
-            None => Err(A::Error::unknown_variant(elem.as_str(), T::NAMES))?,
-        }
-    }
-
-    Ok(flags)
 }
