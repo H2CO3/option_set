@@ -63,7 +63,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use serde::{ Serializer, Deserializer };
 use serde::ser::SerializeSeq;
-use serde::de::{ Visitor, SeqAccess };
+use serde::de::{ Visitor, SeqAccess, Deserialize };
 use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase, KebabCase, TitleCase };
 
 /// Defines an option set type.
@@ -231,6 +231,69 @@ impl<'de, T: OptionSet> Visitor<'de> for OptionSetVisitor<T> {
     }
 }
 
+#[derive(Debug)]
+enum Str<'a> {
+    String(String),
+    Str(&'a str),
+}
+
+impl<'a> Str<'a> {
+    fn as_str(&self) -> &str {
+        match self {
+            Str::Str(s) => s,
+            Str::String(s) => s.as_str()
+        }
+    }
+}
+
+impl<'a> PartialEq for Str<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+struct StrVisitor;
+
+impl<'a> Visitor<'a> for StrVisitor {
+    type Value = Str<'a>;
+
+    fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_string(v.to_owned())
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Str::String(v))
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Str::Str(v))
+    }
+}
+
+impl<'de> Deserialize<'de> for Str<'de> {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(StrVisitor)
+    }
+}
+
+
 /// Actually performs the sequence processing and flag extraction.
 fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
     where A: SeqAccess<'de>, T: OptionSet, S: AsRef<str> {
@@ -239,12 +302,12 @@ fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
 
     let mut flags = T::default();
 
-    while let Some(elem) = seq.next_element::<Cow<'de, str>>()? {
+    while let Some(elem) = seq.next_element::<Str<'de>>()? {
         let mut iter = T::VARIANTS.iter().zip(names);
 
-        match iter.find(|&(_, name)| name.as_ref() == elem) {
+        match iter.find(|&(_, name)| name.as_ref() == elem.as_str()) {
             Some((&flag, _)) => flags |= flag,
-            None => Err(A::Error::unknown_variant(&elem, T::NAMES))?,
+            None => Err(A::Error::unknown_variant(elem.as_str(), T::NAMES))?,
         }
     }
 
