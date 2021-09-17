@@ -122,13 +122,13 @@ macro_rules! option_set {
         }
 
         impl ::serde::ser::Serialize for $name {
-            fn serialize<S: ::serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            fn serialize<S: ::serde::ser::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
                 $crate::serialize(self, serializer, $crate::CaseTransform::$case)
             }
         }
 
         impl<'de> ::serde::de::Deserialize<'de> for $name {
-            fn deserialize<D: ::serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            fn deserialize<D: ::serde::de::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
                 $crate::deserialize(deserializer, $crate::CaseTransform::$case)
             }
         }
