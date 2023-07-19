@@ -1,6 +1,6 @@
 [package]
 name = "option_set"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
 authors = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository = "https://github.com/H2CO3/option_set.git"
