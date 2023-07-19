@@ -32,41 +32,65 @@
 //! }
 //! ```
 
-#![deny(missing_debug_implementations, missing_copy_implementations,
-        trivial_casts, trivial_numeric_casts,
-        unsafe_code,
-        unstable_features,
-        unused_import_braces, unused_qualifications, missing_docs)]
-#![allow(clippy::match_same_arms,
-         clippy::clone_on_ref_ptr,
-         clippy::needless_pass_by_value)]
-#![deny(clippy::wrong_pub_self_convention, clippy::used_underscore_binding,
-        clippy::module_name_repetitions, clippy::similar_names,
-        clippy::pub_enum_variant_names,
-        clippy::missing_docs_in_private_items,
-        clippy::non_ascii_literal, clippy::unicode_not_nfc,
-        clippy::result_unwrap_used, clippy::option_unwrap_used,
-        clippy::option_map_unwrap_or_else, clippy::option_map_unwrap_or,
-        clippy::filter_map,
-        clippy::shadow_unrelated, clippy::shadow_reuse, clippy::shadow_same,
-        clippy::int_plus_one, clippy::string_add_assign, clippy::if_not_else,
-        clippy::invalid_upcast_comparisons,
-        clippy::cast_precision_loss,
-        clippy::cast_possible_wrap, clippy::cast_possible_truncation,
-        clippy::mutex_integer, clippy::mut_mut, clippy::items_after_statements,
-        clippy::print_stdout, clippy::mem_forget, clippy::maybe_infinite_iter)]
+#![deny(
+    missing_debug_implementations,
+    missing_copy_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unsafe_code,
+    unstable_features,
+    unused_import_braces,
+    unused_qualifications,
+    missing_docs
+)]
+#![allow(
+    clippy::match_same_arms,
+    clippy::clone_on_ref_ptr,
+    clippy::needless_pass_by_value
+)]
+#![deny(
+    clippy::wrong_self_convention,
+    clippy::used_underscore_binding,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::enum_variant_names,
+    clippy::missing_docs_in_private_items,
+    clippy::non_ascii_literal,
+    clippy::unicode_not_nfc,
+    clippy::unwrap_used,
+    clippy::map_unwrap_or,
+    clippy::manual_filter_map,
+    clippy::shadow_unrelated,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::int_plus_one,
+    clippy::string_add_assign,
+    clippy::if_not_else,
+    clippy::invalid_upcast_comparisons,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::mutex_integer,
+    clippy::mut_mut,
+    clippy::items_after_statements,
+    clippy::print_stdout,
+    clippy::mem_forget,
+    clippy::maybe_infinite_iter
+)]
 
-extern crate serde;
 extern crate heck;
+extern crate serde;
 
-use std::ops::{ BitAnd, BitOrAssign, Deref };
-use std::fmt::{ self, Formatter };
-use std::borrow::Cow;
-use std::marker::PhantomData;
-use serde::{ Serializer, Deserializer };
+use heck::{
+    ToKebabCase, ToLowerCamelCase, ToShoutySnakeCase, ToSnakeCase, ToTitleCase, ToUpperCamelCase,
+};
+use serde::de::{Deserialize, SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
-use serde::de::{ Visitor, SeqAccess, Deserialize };
-use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase, KebabCase, TitleCase };
+use serde::{Deserializer, Serializer};
+use std::borrow::Cow;
+use std::fmt::{self, Formatter};
+use std::marker::PhantomData;
+use std::ops::{BitAnd, BitOrAssign, Deref};
 
 /// Defines an option set type.
 #[macro_export]
@@ -76,7 +100,7 @@ macro_rules! option_set {
     }) => {
         bitflags! {
             $(#[$outer])*
-            #[derive(Default)]
+            #[derive(Default, PartialEq, Eq, Copy, Clone)]
             pub struct $name: $repr {
                 $(
                     $(#[$inner $($args)*])*
@@ -136,7 +160,7 @@ macro_rules! option_set {
 }
 
 /// Trait for bit flags that forwards to std traits for useful bit operators.
-pub trait OptionSet: Copy + Default + Eq + BitAnd<Output=Self> + BitOrAssign + 'static {
+pub trait OptionSet: Copy + Default + Eq + BitAnd<Output = Self> + BitOrAssign + 'static {
     /// The basis flags (in the algebraic sense): one for each independent option.
     const VARIANTS: &'static [Self];
     /// The corresponding names. `VARIANTS.len() == NAMES.len()` must always hold.
@@ -144,9 +168,10 @@ pub trait OptionSet: Copy + Default + Eq + BitAnd<Output=Self> + BitOrAssign + '
 }
 
 /// Type that knows how to transform the case of individual option flag names.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CaseTransform {
     /// Do not transform the name.
+    #[default]
     Identity,
     /// `lower_snake_case`
     LowerSnake,
@@ -168,27 +193,27 @@ impl CaseTransform {
         use CaseTransform::*;
 
         match self {
-            Identity   => Cow::Borrowed(s),
+            Identity => Cow::Borrowed(s),
             LowerSnake => Cow::Owned(s.to_snake_case()),
             UpperSnake => Cow::Owned(s.to_shouty_snake_case()),
-            LowerCamel => Cow::Owned(s.to_mixed_case()),
-            UpperCamel => Cow::Owned(s.to_camel_case()),
-            Kebab      => Cow::Owned(s.to_kebab_case()),
-            Title      => Cow::Owned(s.to_title_case()),
+            LowerCamel => Cow::Owned(s.to_lower_camel_case()),
+            UpperCamel => Cow::Owned(s.to_upper_camel_case()),
+            Kebab => Cow::Owned(s.to_kebab_case()),
+            Title => Cow::Owned(s.to_title_case()),
         }
     }
 }
 
-impl Default for CaseTransform {
-    fn default() -> Self {
-        CaseTransform::Identity
-    }
-}
-
 /// Serialize an OptionSet's set bits as a sequence of strings.
-pub fn serialize<T, S>(options: &T, serializer: S, transform: CaseTransform) -> Result<S::Ok, S::Error>
-    where T: OptionSet, S: Serializer {
-
+pub fn serialize<T, S>(
+    options: &T,
+    serializer: S,
+    transform: CaseTransform,
+) -> Result<S::Ok, S::Error>
+where
+    T: OptionSet,
+    S: Serializer,
+{
     assert!(T::VARIANTS.len() == T::NAMES.len());
 
     let mut seq = serializer.serialize_seq(T::NAMES.len().into())?;
@@ -204,8 +229,10 @@ pub fn serialize<T, S>(options: &T, serializer: S, transform: CaseTransform) -> 
 
 /// Deserialize set bits from a sequence of name strings.
 pub fn deserialize<'de, T, D>(deserializer: D, transform: CaseTransform) -> Result<T, D::Error>
-    where T: OptionSet, D: Deserializer<'de> {
-
+where
+    T: OptionSet,
+    D: Deserializer<'de>,
+{
     deserializer.deserialize_seq(OptionSetVisitor(transform, PhantomData))
 }
 
@@ -235,8 +262,11 @@ impl<'de, T: OptionSet> Visitor<'de> for OptionSetVisitor<T> {
 
 /// Actually performs the sequence processing and flag extraction.
 fn extract_bits<'de, A, T, S>(mut seq: A, names: &[S]) -> Result<T, A::Error>
-    where A: SeqAccess<'de>, T: OptionSet, S: Deref<Target=str> {
-
+where
+    A: SeqAccess<'de>,
+    T: OptionSet,
+    S: Deref<Target = str>,
+{
     use serde::de::Error;
 
     let mut flags = T::default();
