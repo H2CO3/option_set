@@ -4,14 +4,7 @@
 //! # Usage
 //!
 //! ```
-//! #[macro_use]
-//! extern crate option_set;
-//! #[macro_use]
-//! extern crate bitflags;
-//! extern crate serde;
-//! extern crate serde_json;
-//!
-//! option_set! {
+//! option_set::option_set! {
 //!     struct FooOptions: UpperCamel + u16 {
 //!         const BAR_FIRST        = 0x0001;
 //!         const QUX_SECOND_THING = 0x0080;
@@ -19,17 +12,15 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     let opts_in = FooOptions::BAR_FIRST | FooOptions::LOL_3RD;
-//!     let json = serde_json::to_string_pretty(&opts_in).unwrap();
+//! let opts_in = FooOptions::BAR_FIRST | FooOptions::LOL_3RD;
+//! let json = serde_json::to_string_pretty(&opts_in).unwrap();
 //!
-//!     println!("{}", json);
+//! println!("{}", json);
 //!
-//!     let opts_out: FooOptions = serde_json::from_str(&json).unwrap();
+//! let opts_out: FooOptions = serde_json::from_str(&json).unwrap();
 //!
-//!     println!("{:?}", opts_out);
-//!     assert!(opts_out == opts_in);
-//! }
+//! println!("{:?}", opts_out);
+//! assert!(opts_out == opts_in);
 //! ```
 
 #![deny(
@@ -78,9 +69,6 @@
     clippy::maybe_infinite_iter
 )]
 
-extern crate heck;
-extern crate serde;
-
 use heck::{
     ToKebabCase, ToLowerCamelCase, ToShoutySnakeCase, ToSnakeCase, ToTitleCase, ToUpperCamelCase,
 };
@@ -98,9 +86,9 @@ macro_rules! option_set {
     ($(#[$outer:meta])* pub struct $name:ident: $case:ident + $repr:ty {
         $($(#[$inner:ident $($args:tt)*])* const $variant:ident = $value:expr;)*
     }) => {
-        bitflags! {
+        bitflags::bitflags! {
             $(#[$outer])*
-            #[derive(Default, PartialEq, Eq, Copy, Clone)]
+            #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Debug)]
             pub struct $name: $repr {
                 $(
                     $(#[$inner $($args)*])*
@@ -129,9 +117,9 @@ macro_rules! option_set {
     ($(#[$outer:meta])* struct $name:ident: $case:ident + $repr:ty {
         $($(#[$inner:ident $($args:tt)*])* const $variant:ident = $value:expr;)*
     }) => {
-        bitflags! {
+        bitflags::bitflags! {
             $(#[$outer])*
-            #[derive(Default)]
+            #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, Debug)]
             struct $name: $repr {
                 $(
                     $(#[$inner $($args)*])*
