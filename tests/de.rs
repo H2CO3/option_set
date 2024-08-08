@@ -29,6 +29,6 @@ fn deserialize_yaml() {
     vec:
       - flags: [MY_FLAG]
     ";
-    let value: A = serde_yaml::from_str(data).unwrap();
+    let value: A = serde_yml::from_str(data).unwrap();
     assert!(value.vec[0].flags.contains(Flags::MY_FLAG));
 }
