@@ -281,7 +281,7 @@ enum Str<'a> {
     Str(&'a str),
 }
 
-impl<'a> Deref for Str<'a> {
+impl Deref for Str<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
